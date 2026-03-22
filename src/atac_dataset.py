@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 class ATACDataset(Dataset):
     def __init__(
@@ -62,3 +63,25 @@ class ATACDataset(Dataset):
         x = sparse_df[col].values.astype(np.float32)
 
         return torch.from_numpy(x), torch.from_numpy(y)
+
+def create_dataloader(
+    dense_dir,
+    sparse_dir,
+    batch_size=4,
+    shuffle=True,
+    num_workers=4,
+):
+    dataset = ATACDataset(
+        dense_dir=dense_dir,
+        sparse_dir=sparse_dir,
+    )
+
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+
+    return loader
