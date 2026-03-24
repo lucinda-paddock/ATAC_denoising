@@ -6,9 +6,9 @@ class DAE(nn.Module):
     def __init__(
         self,
         input_dim = 109792,
+        #hidden_dims=[65536, 16384, 4096, 1024, 256],
         hidden_dims=[8192, 4096, 1024, 256],
-        latent_dim=128,
-        dropout=0.1
+        latent_dim=128
     ):
         """
         Args:
@@ -25,15 +25,12 @@ class DAE(nn.Module):
 
         for h in hidden_dims:
             encoder_layers.append(nn.Linear(prev_dim, h))
-            encoder_layers.append(nn.BatchNorm1d(h))
             encoder_layers.append(nn.ReLU())
-            encoder_layers.append(nn.Dropout(dropout))
             prev_dim = h
 
-        self.encoder = nn.Sequential(*encoder_layers)
+        encoder_layers.append(nn.Linear(prev_dim, latent_dim))
 
-        self.fc_mu = nn.Linear(prev_dim, latent_dim)
-        self.fc_logvar = nn.Linear(prev_dim, latent_dim)
+        self.encoder = nn.Sequential(*encoder_layers)
 
         # decoder
         decoder_layers = []
@@ -41,30 +38,25 @@ class DAE(nn.Module):
 
         for h in reversed(hidden_dims):
             decoder_layers.append(nn.Linear(prev_dim, h))
-            decoder_layers.append(nn.BatchNorm1d(h))
             decoder_layers.append(nn.ReLU())
             prev_dim = h
 
         decoder_layers.append(nn.Linear(prev_dim, input_dim))
+        decoder_layers.append(nn.ReLU())
+
         self.decoder = nn.Sequential(*decoder_layers)
 
     def encode(self, x):
-        h = self.encoder(x)
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
-        return mu, logvar
-    
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+        return self.encoder(x)
 
     def decode(self, z):
         return self.decoder(z)
 
-    def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
+    def forward(self, x, return_latent=False):
+        z = self.encode(x)
         x_hat = self.decode(z)
-
-        return x_hat, mu, logvar
+    
+        if return_latent:
+            return x_hat, z
+    
+        return x_hat

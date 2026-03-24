@@ -11,7 +11,6 @@ class ATACDataset(Dataset):
         self,
         dense_dir,
         sparse_dir,
-        sparsity,
         file_list=None
     ):
         """
@@ -22,7 +21,6 @@ class ATACDataset(Dataset):
         """
         self.dense_dir = dense_dir
         self.sparse_dir = sparse_dir
-        self.sparsity = sparsity
 
         # match files by name
         self.files = file_list if file_list else sorted(os.listdir(dense_dir))
@@ -41,16 +39,6 @@ class ATACDataset(Dataset):
         else:
             df = pd.read_csv(path, sep="\t")
         return df
-    
-    def _load_sparse_tsv(self, path):
-        """Handles gzipped TSVs"""
-        if path.endswith(".gz"):
-            with gzip.open(path, "rt") as f:
-                df = pd.read_csv(f, sep="\t")
-        else:
-            df = pd.read_csv(path, sep="\t")
-        cols = [i for i in df.columns if f"_{self.sparsity}_" in i]
-        return df[cols]
 
     def __len__(self):
         return len(self.files)
@@ -63,14 +51,14 @@ class ATACDataset(Dataset):
 
         # load data
         dense_df = self._load_tsv(dense_path)
-        sparse_df = self._load_sparse_tsv(sparse_path)
+        sparse_df = self._load_tsv(sparse_path)
 
         # get counts
         # dense: counts in column 1
         y = dense_df[dense_df.columns[1]].values.astype(np.float32)
 
         # sparse: multiple columns after bin, pick a random one
-        sparse_cols = sparse_df.columns[:]
+        sparse_cols = sparse_df.columns[1:]
         col = np.random.choice(sparse_cols)
         x = sparse_df[col].values.astype(np.float32)
 
@@ -82,12 +70,10 @@ def create_dataloader(
     batch_size=4,
     shuffle=True,
     num_workers=4,
-    sparsity=1
 ):
     dataset = ATACDataset(
         dense_dir=dense_dir,
         sparse_dir=sparse_dir,
-        sparsity=sparsity
     )
 
     loader = DataLoader(
