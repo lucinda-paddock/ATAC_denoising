@@ -18,14 +18,18 @@ def plot_bin_counts(
     sub_y = y[bin_range[0]:bin_range[1]]
     bins = [i for i in range(bin_range[0],bin_range[1])]
     ax.bar(x = bins,
-            height = (sub_y),
-            color = 'blue',
-            alpha = 0.8)
+           height = (sub_y),
+           color = 'blue',
+           alpha = 0.8,
+           label = 'Full Counts')
     ax.bar(x = bins,
             height = (sub_x),
             color = 'red',
-            alpha = 0.8)
+            alpha = 0.8,
+           label = 'Sparse Counts')
     ax.set(xlabel = 'Chr19 Bin Index',
            ylabel = 'Counts in Bin')
+    
+    ax.legend()
 
     return fig
