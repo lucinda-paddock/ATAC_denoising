@@ -12,6 +12,7 @@ class ATACDataset(Dataset):
         dense_dir,
         sparse_dir,
         sparsity,
+        sparse_function=None,
         file_list=None
     ):
         """
@@ -23,6 +24,7 @@ class ATACDataset(Dataset):
         self.dense_dir = dense_dir
         self.sparse_dir = sparse_dir
         self.sparsity = sparsity
+        self.sparse_function = sparse_function
 
         # match files by name
         self.files = file_list if file_list else sorted(os.listdir(dense_dir))
@@ -63,18 +65,34 @@ class ATACDataset(Dataset):
 
         # load data
         dense_df = self._load_tsv(dense_path)
-        sparse_df = self._load_sparse_tsv(sparse_path)
 
         # get counts
         # dense: counts in column 1
         y = dense_df[dense_df.columns[1]].values.astype(np.float32)
 
-        # sparse: multiple columns after bin, pick a random one
-        sparse_cols = sparse_df.columns[:]
-        col = np.random.choice(sparse_cols)
-        x = sparse_df[col].values.astype(np.float32)
+        # sparse: depends on sparsity function
+        # if sparsing function provided, use that
+        if self.sparse_function is not None:
+            x = self.sparse_function(y, self.sparsity)
+         # if none, pick a random sparse colum
+        else:
+            sparse_df = self._load_sparse_tsv(sparse_path)
+            sparse_cols = sparse_df.columns[:]
+            col = np.random.choice(sparse_cols)
+            x = sparse_df[col].values.astype(np.float32)
 
         return torch.from_numpy(x), torch.from_numpy(y)
+
+class SampleReads:
+    
+    def __call__(self, x, sparsity):
+
+        sparse_counts = np.random.binomial(
+            x.astype(int),
+            sparsity
+        )
+
+        return sparse_counts.astype(np.float32)
 
 def create_dataloader(
     dense_dir,
@@ -87,7 +105,8 @@ def create_dataloader(
     dataset = ATACDataset(
         dense_dir=dense_dir,
         sparse_dir=sparse_dir,
-        sparsity=sparsity
+        sparsity=sparsity,
+        sparse_function=SampleReads()
     )
 
     loader = DataLoader(
