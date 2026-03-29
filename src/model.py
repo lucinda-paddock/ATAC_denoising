@@ -47,6 +47,9 @@ class VAE(nn.Module):
         
         super().__init__()
 
+        self.dropout = dropout
+        self.decode_alpha = decode_alpha
+
         self.attention_gates = nn.ModuleList()
 
         # encoder
@@ -57,7 +60,7 @@ class VAE(nn.Module):
             encoder_layers.append(nn.Linear(prev_dim, h))
             encoder_layers.append(nn.BatchNorm1d(h))
             encoder_layers.append(nn.ReLU())
-            encoder_layers.append(nn.Dropout(dropout))
+            encoder_layers.append(nn.Dropout(self.dropout))
             prev_dim = h
 
         self.encoder = nn.Sequential(*encoder_layers)
@@ -78,8 +81,8 @@ class VAE(nn.Module):
         decoder_layers.append(nn.Linear(prev_dim, input_dim))
         self.decoder = nn.Sequential(*decoder_layers)
 
-
-        for e_dim, d_dim in zip(hidden_dims[::-1], hidden_dims):
+        decoder_dims = list(reversed(hidden_dims))
+        for e_dim, d_dim in zip(decoder_dims, decoder_dims):
             self.attention_gates.append(
                 AttentionGate(e_dim, d_dim, hidden_dim=d_dim // 2)
             )
@@ -107,11 +110,16 @@ class VAE(nn.Module):
         for i, layer in enumerate(self.decoder[:-1]):
             z = layer(z)
 
-            if i < len(activations):
-                skip = activations[-(i+1)]
-                gated_skip = self.attention_gates[i](skip, z)
+            #if i < len(activations):
+            #    skip = activations[-(gate_idx+1)]
+            #    z = z + self.decode_alpha * skip
 
-                z = z + decode_alpha * gated_skip
+            if isinstance(layer, nn.Linear) and gate_idx < len(self.attention_gates):
+                skip = activations[-(gate_idx+1)]
+                gated_skip = self.attention_gates[gate_idx](skip, z)
+
+                z = z + self.decode_alpha * gated_skip
+                gate_idx += 1
 
         return self.decoder[-1](z)
 
