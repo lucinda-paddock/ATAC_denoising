@@ -9,8 +9,7 @@ from torch.utils.data import DataLoader
 class ATACDataset(Dataset):
     def __init__(
         self,
-        dense_dir,
-        sparse_dir,
+        atac_dir,
         sparsity,
         sparse_function=None,
         file_list=None
@@ -21,19 +20,12 @@ class ATACDataset(Dataset):
             sparse_dir (str): directory with sparse versions
             file_list (list): optional subset of filenames
         """
-        self.dense_dir = dense_dir
-        self.sparse_dir = sparse_dir
+        self.atac_dir = atac_dir
         self.sparsity = sparsity
         self.sparse_function = sparse_function
 
         # match files by name
-        self.files = file_list if file_list else sorted(os.listdir(dense_dir))
-
-        # sanity check
-        self.files = [
-            f for f in self.files
-            if os.path.exists(os.path.join(sparse_dir, f))
-        ]
+        self.files = file_list if file_list else sorted(os.listdir(atac_dir))
 
     def _load_tsv(self, path):
         """Handles gzipped TSVs"""
@@ -42,7 +34,8 @@ class ATACDataset(Dataset):
                 df = pd.read_csv(f, sep="\t")
         else:
             df = pd.read_csv(path, sep="\t")
-        return df
+        cols = [i for i in df.columns if f"_{self.sparsity}_" not in i]
+        return df[cols]
     
     def _load_sparse_tsv(self, path):
         """Handles gzipped TSVs"""
@@ -60,11 +53,10 @@ class ATACDataset(Dataset):
     def __getitem__(self, idx):
         fname = self.files[idx]
 
-        dense_path = os.path.join(self.dense_dir, fname)
-        sparse_path = os.path.join(self.sparse_dir, fname)
+        atac_path = os.path.join(self.atac_dir, fname)
 
         # load data
-        dense_df = self._load_tsv(dense_path)
+        dense_df = self._load_tsv(atac_path)
 
         # get counts
         # dense: counts in column 1
@@ -76,7 +68,7 @@ class ATACDataset(Dataset):
             x = self.sparse_function(y, self.sparsity)
          # if none, pick a random sparse colum
         else:
-            sparse_df = self._load_sparse_tsv(sparse_path)
+            sparse_df = self._load_sparse_tsv(atac_path)
             sparse_cols = sparse_df.columns[:]
             col = np.random.choice(sparse_cols)
             x = sparse_df[col].values.astype(np.float32)
@@ -95,26 +87,50 @@ class SampleReads:
         return sparse_counts.astype(np.float32)
 
 def create_dataloader(
-    dense_dir,
-    sparse_dir,
+    atac_dir,
     batch_size=4,
     shuffle=True,
     num_workers=4,
-    sparsity=1
+    sparsity=1,
+    val_split=0.2,
+    seed=42
 ):
-    dataset = ATACDataset(
-        dense_dir=dense_dir,
-        sparse_dir=sparse_dir,
+    all_files = sorted(os.listdir(atac_dir))
+    rng = np.random.RandomState(seed)
+    rng.shuffle(all_files)
+
+    split_idx = int(len(all_files) * (1 - val_split))
+    train_files = all_files[:split_idx]
+    val_files = all_files[split_idx:]
+
+    train_dataset = ATACDataset(
+        atac_dir=atac_dir,
         sparsity=sparsity,
-        sparse_function=SampleReads()
+        sparse_function=None,#sparse_function=SampleReads(),
+        file_list=train_files
     )
 
-    loader = DataLoader(
-        dataset,
+    val_dataset = ATACDataset(
+        atac_dir=atac_dir,
+        sparsity=sparsity,
+        sparse_function=None,#sparse_function=SampleReads(),
+        file_list=val_files
+    )
+
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=True,
     )
 
-    return loader
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,  # IMPORTANT
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+    
+    return train_loader, val_loader
