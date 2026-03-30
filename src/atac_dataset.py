@@ -29,21 +29,13 @@ class ATACDataset(Dataset):
 
     def _load_tsv(self, path):
         """Handles gzipped TSVs"""
-        if path.endswith(".gz"):
-            with gzip.open(path, "rt") as f:
-                df = pd.read_csv(f, sep="\t")
-        else:
-            df = pd.read_csv(path, sep="\t")
-        cols = [i for i in df.columns if f"_{self.sparsity}_" not in i]
-        return df[cols]
+        df = pd.read_csv(path, sep="\t")
+        col = [df.columns[1:]]
+        return df[col]
     
     def _load_sparse_tsv(self, path):
         """Handles gzipped TSVs"""
-        if path.endswith(".gz"):
-            with gzip.open(path, "rt") as f:
-                df = pd.read_csv(f, sep="\t")
-        else:
-            df = pd.read_csv(path, sep="\t")
+        df = pd.read_csv(path, sep="\t")
         cols = [i for i in df.columns if f"_{self.sparsity}_" in i]
         return df[cols]
 

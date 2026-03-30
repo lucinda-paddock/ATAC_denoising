@@ -49,7 +49,7 @@ class VAE(nn.Module):
 
         self.dropout = dropout
         self.decode_alpha = decode_alpha
-
+        self.theta = nn.Parameter(torch.ones(input_dim))
         self.attention_gates = nn.ModuleList()
 
         # encoder
@@ -121,11 +121,16 @@ class VAE(nn.Module):
                 z = z + self.decode_alpha * gated_skip
                 gate_idx += 1
 
-        return self.decoder[-1](z)
+        x_hat = self.decoder[-1](z)
+        #mu = F.softplus(x_hat) + 1e-4
+        #return mu
+        return x_hat
+        
 
     def forward(self, x):
         mu, logvar, activations = self.encode(x)
         z = self.reparameterize(mu, logvar)
         x_hat = self.decode(z, activations)
+        theta = F.softplus(self.theta) + 1e-4
 
         return x_hat, mu, logvar
