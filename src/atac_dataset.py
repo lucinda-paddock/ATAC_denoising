@@ -28,13 +28,11 @@ class ATACDataset(Dataset):
         self.files = file_list if file_list else sorted(os.listdir(atac_dir))
 
     def _load_tsv(self, path):
-        """Handles gzipped TSVs"""
         df = pd.read_csv(path, sep="\t")
-        col = [df.columns[1:]]
+        col = [df.columns[1]]
         return df[col]
     
     def _load_sparse_tsv(self, path):
-        """Handles gzipped TSVs"""
         df = pd.read_csv(path, sep="\t")
         cols = [i for i in df.columns if f"_{self.sparsity}_" in i]
         return df[cols]
@@ -52,7 +50,7 @@ class ATACDataset(Dataset):
 
         # get counts
         # dense: counts in column 1
-        y = dense_df[dense_df.columns[1]].values.astype(np.float32)
+        y = dense_df[dense_df.columns[0]].values.astype(np.float32)
 
         # sparse: depends on sparsity function
         # if sparsing function provided, use that
@@ -120,7 +118,7 @@ def create_dataloader(
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=False,  # IMPORTANT
+        shuffle=False, 
         num_workers=num_workers,
         pin_memory=True,
     )

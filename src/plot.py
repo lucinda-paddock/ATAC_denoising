@@ -36,7 +36,8 @@ def plot_bin_counts(
 
 def plot_bin_counts_single(
     x,
-    bin_range=(0, 1000)
+    bin_range=(0, 1000),
+    color="red",
 ):
     """
     Args:
@@ -50,8 +51,7 @@ def plot_bin_counts_single(
     bins = [i for i in range(bin_range[0],bin_range[1])]
     ax.bar(x = bins,
             height = (sub_x),
-            color = 'red',
-            alpha = 0.8,)
+            color = color,)
     ax.set(xlabel = 'Chr19 Bin Index',
            ylabel = 'Counts in Bin')
     
